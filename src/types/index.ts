@@ -33,4 +33,8 @@ export interface StatementData {
   startBalance: number;
   endBalance: number;
   numberOfTransactions: number;
+  highestBalance: number;
+  lowestBalance: number;
+  maxTxAmount: number;
+  minTxAmount: number;
 }

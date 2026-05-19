@@ -35,6 +35,10 @@ export default function Home() {
     startBalance: 228807.94,
     endBalance: 100000.00,
     numberOfTransactions: 40,
+    highestBalance: 500000,
+    lowestBalance: 50000,
+    maxTxAmount: 200000,
+    minTxAmount: 1000,
   });
 
   const handleGenerate = () => {

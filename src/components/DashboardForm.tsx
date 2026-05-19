@@ -141,6 +141,36 @@ export function DashboardForm({ data, onChange, onGenerate }: DashboardFormProps
               <input type="number" name="numberOfTransactions" value={data.numberOfTransactions} onChange={handleChange} className="w-full bg-gray-800 border border-gray-700 rounded p-2 focus:border-blue-500 outline-none" />
             </div>
           </div>
+
+          {/* Balance Guardrails */}
+          <div className="mt-4">
+            <p className="text-xs text-gray-500 mb-3">Balance Guardrails — keeps the running balance within a realistic range during generation.</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Highest Balance (peak balance allowed)</label>
+                <input type="number" name="highestBalance" value={data.highestBalance} onChange={handleChange} className="w-full bg-gray-800 border border-gray-700 rounded p-2 focus:border-blue-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Lowest Balance (minimum balance allowed)</label>
+                <input type="number" name="lowestBalance" value={data.lowestBalance} onChange={handleChange} className="w-full bg-gray-800 border border-gray-700 rounded p-2 focus:border-blue-500 outline-none" />
+              </div>
+            </div>
+          </div>
+
+          {/* Transaction Amount Range */}
+          <div className="mt-4">
+            <p className="text-xs text-gray-500 mb-3">Transaction Amount Range — each individual deposit or withdrawal will be between these two values.</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Max Transaction Amount</label>
+                <input type="number" name="maxTxAmount" value={data.maxTxAmount} onChange={handleChange} className="w-full bg-gray-800 border border-gray-700 rounded p-2 focus:border-blue-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Min Transaction Amount</label>
+                <input type="number" name="minTxAmount" value={data.minTxAmount} onChange={handleChange} className="w-full bg-gray-800 border border-gray-700 rounded p-2 focus:border-blue-500 outline-none" />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       
