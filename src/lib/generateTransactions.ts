@@ -33,73 +33,87 @@ const PARTICULARS_WITHDRAWAL = [
 ];
 
 export function generateTransactions(data: StatementData): Transaction[] {
-  const transactions: Transaction[] = [];
   const start = new Date(data.startDate);
   const end = new Date(data.endDate);
   const diffDays = Math.max(1, differenceInDays(end, start));
-
   const numTransactions = data.numberOfTransactions;
 
-  // ~30% withdrawals, ~70% deposits (realistic savings account mix)
+  // ~30% withdrawals, ~70% deposits
   const numWithdrawals = Math.max(1, Math.floor(numTransactions * 0.30));
   const numDeposits = numTransactions - numWithdrawals;
 
-  // Generate random raw deposit amounts
-  const rawDeposits = Array.from({ length: numDeposits }, () =>
-    Math.round((Math.random() * 300000 + 50000) * 100) / 100
-  );
-
-  // Generate random raw withdrawal amounts (smaller than deposits)
+  // ── Step 1: Generate raw random withdrawal amounts ──────────────────────
+  // These are freely random. We will NOT change these.
   const rawWithdrawals = Array.from({ length: numWithdrawals }, () =>
-    Math.round((Math.random() * 80000 + 5000) * 100) / 100
+    Math.round((Math.random() * 80000 + 10000) * 100) / 100
   );
-
-  const sumDeposits = rawDeposits.reduce((a, b) => a + b, 0);
-  const sumWithdrawals = rawWithdrawals.reduce((a, b) => a + b, 0);
-
-  // Core invariant: startBalance + totalDeposits - totalWithdrawals = endBalance
-  // So: totalDeposits - totalWithdrawals must equal (endBalance - startBalance)
-  const requiredNet = Math.round((data.endBalance - data.startBalance) * 100) / 100;
-  const currentNet = Math.round((sumDeposits - sumWithdrawals) * 100) / 100;
-
-  // Adjust the last deposit to absorb the difference and make the equation exact
-  const adjustment = Math.round((requiredNet - currentNet) * 100) / 100;
-  rawDeposits[rawDeposits.length - 1] = Math.round(
-    (rawDeposits[rawDeposits.length - 1] + adjustment) * 100
+  const totalWithdrawals = Math.round(
+    rawWithdrawals.reduce((a, b) => a + b, 0) * 100
   ) / 100;
 
-  // Safety: if last deposit went negative, redistribute
-  if (rawDeposits[rawDeposits.length - 1] < 1000) {
-    const deficit = 1000 - rawDeposits[rawDeposits.length - 1];
-    rawDeposits[rawDeposits.length - 1] += deficit;
-    rawWithdrawals[0] = Math.max(100, rawWithdrawals[0] - deficit);
+  // ── Step 2: Calculate exactly what total deposits must be ────────────────
+  // Invariant: startBalance + totalDeposits - totalWithdrawals = endBalance
+  // Therefore: totalDeposits = endBalance - startBalance + totalWithdrawals
+  const requiredTotalDeposits = Math.round(
+    (data.endBalance - data.startBalance + totalWithdrawals) * 100
+  ) / 100;
+
+  // Safety: if required deposits is too small (can happen if end << start),
+  // we scale down withdrawals to make room.
+  const minDepositsNeeded = numDeposits * 1000; // at least 1000 per deposit slot
+  const effectiveTotalDeposits = Math.max(requiredTotalDeposits, minDepositsNeeded);
+
+  // ── Step 3: Generate raw deposit "weights", then scale to hit the target ─
+  // Each raw weight is random; we scale the whole array so they sum exactly
+  // to effectiveTotalDeposits.
+  const rawDepositWeights = Array.from({ length: numDeposits }, () =>
+    Math.random() * 300000 + 50000
+  );
+  const weightSum = rawDepositWeights.reduce((a, b) => a + b, 0);
+  const scaleFactor = effectiveTotalDeposits / weightSum;
+
+  // Round each deposit to 2 decimal places
+  const scaledDeposits = rawDepositWeights.map(w =>
+    Math.round(w * scaleFactor * 100) / 100
+  );
+
+  // Fix any tiny rounding drift in the last deposit so the sum is exact
+  const depositSum = Math.round(scaledDeposits.reduce((a, b) => a + b, 0) * 100) / 100;
+  const drift = Math.round((effectiveTotalDeposits - depositSum) * 100) / 100;
+  scaledDeposits[scaledDeposits.length - 1] =
+    Math.round((scaledDeposits[scaledDeposits.length - 1] + drift) * 100) / 100;
+
+  // If we had to boost deposits beyond requiredTotalDeposits (safety case),
+  // also boost the last withdrawal proportionally so the end balance is still correct
+  if (effectiveTotalDeposits > requiredTotalDeposits) {
+    const extraDeposit = Math.round((effectiveTotalDeposits - requiredTotalDeposits) * 100) / 100;
+    rawWithdrawals[rawWithdrawals.length - 1] =
+      Math.round((rawWithdrawals[rawWithdrawals.length - 1] + extraDeposit) * 100) / 100;
   }
 
-  // Combine into a unified list with type flags
+  // ── Step 4: Combine, assign dates, sort chronologically ─────────────────
   type TxRaw = { amount: number; isDeposit: boolean };
   const combined: TxRaw[] = [
-    ...rawDeposits.map(d => ({ amount: d, isDeposit: true })),
+    ...scaledDeposits.map(d => ({ amount: d, isDeposit: true })),
     ...rawWithdrawals.map(w => ({ amount: w, isDeposit: false })),
   ];
 
-  // Assign random dates and sort chronologically
   const indexed = combined.map(tx => ({
     tx,
     date: addDays(start, Math.floor(Math.random() * diffDays)),
   }));
   indexed.sort((a, b) => a.date.getTime() - b.date.getTime());
 
-  // Build transactions with correct running balance
+  // ── Step 5: Build transactions with verified running balance ─────────────
+  const transactions: Transaction[] = [];
   let runningBalance = data.startBalance;
 
   for (let i = 0; i < indexed.length; i++) {
     const { tx, date } = indexed[i];
 
-    if (tx.isDeposit) {
-      runningBalance = Math.round((runningBalance + tx.amount) * 100) / 100;
-    } else {
-      runningBalance = Math.round((runningBalance - tx.amount) * 100) / 100;
-    }
+    runningBalance = tx.isDeposit
+      ? Math.round((runningBalance + tx.amount) * 100) / 100
+      : Math.round((runningBalance - tx.amount) * 100) / 100;
 
     const particulars = tx.isDeposit
       ? PARTICULARS_DEPOSIT[Math.floor(Math.random() * PARTICULARS_DEPOSIT.length)]
