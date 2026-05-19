@@ -1,4 +1,5 @@
 import { StatementData, Transaction } from '../types';
+// @ts-ignore
 import { addDays, differenceInDays, format } from 'date-fns';
 
 const PARTICULARS_DEPOSIT = [
